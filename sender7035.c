@@ -73,10 +73,7 @@ int main(int argc, char *argv[]) {
       return -1;
    }
    rwaSeg->segmentNumber = nextSegmentNumber + 1; // segment number of initial window request is same as first data segment
-   rwaSeg->RWA = 1;
-   rwaSeg->ACK = 0;
-   rwaSeg->DAT = 0;
-   rwaSeg->EOM = 0;
+   rwaSeg->flags = RWA;
    rwaSeg->size = 0;
 
    printf("Sending initial RWA Segment.\n\n");
@@ -170,7 +167,7 @@ void waitForNewWindow() {
       exit(-1);
    }
    rwaSeg->segmentNumber = 0; // we do not want to increment with function call
-   rwaSeg->RWA = 1;
+   rwaSeg->flags = RWA;
    int bytes = sendSegment(rwaSeg, false);
    if (bytes < 0) {
       perror("Error - retransmitting RWA segment");
@@ -186,7 +183,7 @@ void waitForNewWindow() {
 
    while (receiversWindowSize <= 0) {
       Header* response = listenForSegment(); // Await window size from receiver
-      if (response->ACK == 1) {
+      if (response->flags & ACK) {
          removeNodes(response->acknowledgement);
       }
       receiversWindowSize = response->window;   // Update receiversWindowSize
@@ -221,7 +218,7 @@ void endOfMessage() {
          continue;
       }
       printHeader(segResponse);
-      if (segResponse->ACK == 1) {
+      if (segResponse->flags & ACK) {
          printf("received ack for segment %u\n\n", segResponse->segmentNumber);
          fflush(stdout);
          removeNodes(segResponse->acknowledgement);
@@ -242,9 +239,7 @@ void endOfMessage() {
       exit(-1);
    }
    eomSeg->segmentNumber = 0; // Arbitrary value, does not get checked in receiver
-   eomSeg->EOM = 1;
-   eomSeg->DAT = 0;
-   eomSeg->RWA = 0;
+   eomSeg->flags = EOM;
    eomSeg->size = 0;
 
    printf("Sending EOM segment... ");
@@ -273,7 +268,7 @@ int sendSegment(Header *segP, bool isRetry) {
    if (isRetry == false) { // Not a retransmission, first send of segment
       receiversWindowSize -= 1;
    }
-   if (segP->RWA != 1) {
+   if (segP->flags & DAT) {
       addNode(segP);
    }
    return bytes;
@@ -292,10 +287,7 @@ Header* getDataHeader(char buff[]) {
       exit(-1);
    }
    seg->segmentNumber = getSegmentNumber();
-   seg->ACK = 0;
-   seg->EOM = 0;
-   seg->RWA = 0;
-   seg->DAT = 1;
+   seg->flags = DAT;
    seg->size = strlen(buff);
    strncpy(seg->data, buff, 512);
    return seg;
@@ -400,9 +392,12 @@ void removeNodes(int segNum) {
    printf("Removing segments up to and including %u\n\n", segNum);
    fflush(stdout);
    if (head != NULL && head->segment->segmentNumber > segNum) { // segment already acked and removed
+      printf("Segment %u already acked, doing nothing.\n\n", segNum);
+      fflush(stdout);
       return;
    }
    while (head != NULL) {
+      printf("Head segment Number: %u\n\n", head->segment->segmentNumber);
       if (head->segment->segmentNumber <= segNum) {
          Node *temp = head;
          head = temp->next;
@@ -420,10 +415,7 @@ void removeNodes(int segNum) {
 void printHeader(Header *segP) {
    printf("\nSegment Number: %u\n", segP->segmentNumber);
    printf("Ackowledgement: %u\n", segP->acknowledgement);
-   printf("DAT: %u\n", segP->DAT);
-   printf("ACK: %u\n", segP->ACK);
-   printf("RWA: %u\n", segP->RWA);
-   printf("EOM: %u\n", segP->EOM);
+   printf("Flags: %u\n", segP->flags);
    printf("Window: %u\n", segP->window);
    printf("Data Size: %u\n", segP->size);
    printf("Data: %s\n\n", segP->data);

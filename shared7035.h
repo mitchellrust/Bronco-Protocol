@@ -15,6 +15,11 @@
 // Includes for shared.h
 #include <stdint.h>
 
+#define DAT 0x80
+#define ACK 0x40
+#define RWA 0x20
+#define EOM 0x10
+
 // Bronco Protocol Header required
 // for every transmission
 typedef struct Header
@@ -22,12 +27,7 @@ typedef struct Header
     u_int16_t segmentNumber;
     u_int16_t acknowledgement;
 
-    // Assign bit fields
-    unsigned int DAT : 1;
-    unsigned int ACK : 1;
-    unsigned int RWA : 1;
-    unsigned int EOM : 1;
-    unsigned int     : 4; // fill to 8 bits
+    unsigned char flags; // 8 bits
 
     u_int8_t window;
     u_int16_t size;

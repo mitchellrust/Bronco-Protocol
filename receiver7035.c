@@ -65,12 +65,12 @@ int main(int argc, char *argv[]) {
 
          windowSize -= 1; // decrement window size
 
-         if (seg->DAT == 1) { // Data segment received
+         if (seg->flags & DAT) { // Data segment received
             addNodeInOrder(seg);
-         } else if (seg->RWA == 1) { // Window Advertisement requested
+         } else if (seg->flags & RWA) { // Window Advertisement requested
             acknowledgeRWASegment();
             free(seg);
-         } else if (seg->EOM == 1) { // No more data segments to come, end execution
+         } else if (seg->flags & EOM) { // No more data segments to come, end execution
             timer.it_value.tv_sec = 0;
             setitimer(ITIMER_REAL, &timer, NULL);
             free(seg);
@@ -108,10 +108,7 @@ void acknowledgeSegments() {
    }
 
    seg->acknowledgement = segNum;
-   seg->ACK = 1;
-   seg->EOM = 0;
-   seg->RWA = 0;
-   seg->DAT = 0;
+   seg->flags = ACK;
    seg->window = windowSize;
    int bytes = sendSegment(seg);
    if (bytes < 0) {
@@ -126,7 +123,7 @@ void acknowledgeRWASegment() {
       perror("Error - malloc for sending acknowledgement");
       return;
    }
-   seg->ACK = 0;
+   seg->flags = 0;
    seg->window = windowSize;
    int bytes = sendSegment(seg);
    if (bytes < 0) {
@@ -236,10 +233,7 @@ void writeMessage() {
 void printHeader(Header *segP) {
    printf("Segment Number: %u\n", segP->segmentNumber);
    printf("Ackowledgement: %u\n", segP->acknowledgement);
-   printf("DAT: %u\n", segP->DAT);
-   printf("ACK: %u\n", segP->ACK);
-   printf("RWA: %u\n", segP->RWA);
-   printf("EOM: %u\n", segP->EOM);
+   printf("Flags: %u\n", segP->flags);
    printf("Window: %u\n", segP->window);
    printf("Data Size: %u\n", segP->size);
    printf("Data: %s\n\n\n", segP->data);
