@@ -6,7 +6,7 @@
 int receiversWindowSize = 0;  // # of segments receiver is prepared to accept
 int sockfd;                   // file descriptor for open socket
 struct sockaddr_in dest;      // destination (receiver) for sent segments
-int nextSegmentNumber = 40;   // incremented segment number for sending data segments
+int nextSegmentNumber = -1;   // incremented segment number for sending data segments
 Node* head;                   // pointer to first node in linked list of unacked segments
 Header* rwaSeg;               // pointer to generic RWA segment
 bool waitingForWindow = false;// waiting for new window from receiver
@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
    rwaSeg->size = 0;
 
    printf("Sending initial RWA Segment.\n\n");
+   printHeader(rwaSeg);
    fflush(stdout);
 
    // Send RWA segment
@@ -219,7 +220,7 @@ void endOfMessage() {
       }
       printHeader(segResponse);
       if (segResponse->flags & ACK) {
-         printf("received ack for segment %u\n\n", segResponse->segmentNumber);
+         printf("received ack for segment %u\n\n", segResponse->acknowledgement);
          fflush(stdout);
          removeNodes(segResponse->acknowledgement);
       }
@@ -265,9 +266,9 @@ int sendSegment(Header *segP, bool isRetry) {
       fflush(stdout);
       return -1;
    }
-   if (isRetry == false) { // Not a retransmission, first send of segment
-      receiversWindowSize -= 1;
-   }
+
+   receiversWindowSize -= 1;
+
    if (segP->flags & DAT) {
       addNode(segP);
    }
@@ -326,6 +327,14 @@ void retransmitSegments() {
    Node *currentNode = head;
 
    while (currentNode->next != NULL) {
+
+      // Check window size before continuing
+      // if (receiversWindowSize <= 0) {
+      //    printf("Receiver is full, waiting for new window.\n\n");
+      //    fflush(stdout);
+      //    waitForNewWindow();
+      // }
+      
       int bytes = sendSegment(currentNode->segment, true); // retransmit segment
       if (bytes < 0) {
          perror("Error - retransmitting segment");

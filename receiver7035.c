@@ -63,6 +63,11 @@ int main(int argc, char *argv[]) {
             perror("Error - receiving from socket");
          }
 
+         if (DEBUG) {
+            printf("Segment Received:\n");
+            printHeader(seg);
+         }
+
          windowSize -= 1; // decrement window size
 
          if (seg->flags & DAT) { // Data segment received
@@ -77,8 +82,8 @@ int main(int argc, char *argv[]) {
             done = true;
             break;
          } else { // Something happened, error handle here
-            printf("Unknown packet received. Printing contents:\n");
-            printHeader(seg);
+            printf("Unknown packet received. Printing contents:\n"); // TODO: remove this
+            printHeader(seg); // TODO: remove this
             free(seg);
          }      
       }
