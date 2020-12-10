@@ -58,32 +58,48 @@ int main(int argc, char *argv[]) {
             return -1;
          }
 
+         if (DEBUG) {
+            printf("Listening for new segment...\n");
+         }
+
          int n = recvfrom(sockfd, seg, sizeof(*seg), 0, (struct sockaddr *) &source, (socklen_t *) &sourceLen);
          if (n < 0) {
             perror("Error - receiving from socket");
          }
 
-         if (DEBUG) {
-            printf("Segment Received:\n");
-            printHeader(seg);
-         }
-
          windowSize -= 1; // decrement window size
 
          if (seg->flags & DAT) { // Data segment received
+            if (DEBUG) {
+               printf("DAT segment received.\n");
+               printHeader(seg);
+               fflush(stdout);
+            }
             addNodeInOrder(seg);
          } else if (seg->flags & RWA) { // Window Advertisement requested
+            if (DEBUG) {
+               printf("RWA segment received.\n");
+               printHeader(seg);
+               fflush(stdout);
+            }
             acknowledgeRWASegment();
             free(seg);
          } else if (seg->flags & EOM) { // No more data segments to come, end execution
+            if (DEBUG) {
+               printf("EOM segment received.\n");
+               printHeader(seg);
+               fflush(stdout);
+            }
             timer.it_value.tv_sec = 0;
             setitimer(ITIMER_REAL, &timer, NULL);
             free(seg);
             done = true;
             break;
          } else { // Something happened, error handle here
-            printf("Unknown packet received. Printing contents:\n"); // TODO: remove this
-            printHeader(seg); // TODO: remove this
+            if (DEBUG) {
+               printf("Unknown packet received. Printing contents:\n"); // TODO: remove this
+               printHeader(seg); // TODO: remove this
+            }
             free(seg);
          }      
       }
@@ -112,6 +128,10 @@ void acknowledgeSegments() {
       return;
    }
 
+   if (DEBUG) {
+      printf("Timer expired, acknowledging segments up to and including %u\n\n", segNum);
+   }
+
    seg->acknowledgement = segNum;
    seg->flags = ACK;
    seg->window = windowSize;
@@ -123,6 +143,9 @@ void acknowledgeSegments() {
 }
 
 void acknowledgeRWASegment() {
+   if (DEBUG) {
+      printf("Acknowledging RWA segment.\n\n");
+   }
    Header *seg = malloc(sizeof(struct Header));
    if (seg == NULL) { // malloc failed
       perror("Error - malloc for sending acknowledgement");
