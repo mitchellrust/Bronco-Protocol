@@ -93,7 +93,6 @@ int main(int argc, char *argv[]) {
       receiversWindowSize = 0;
       Header* rwaResponse = listenForSegment();    // Await window size from receiver
       printHeader(rwaResponse);
-      receiversWindowSize = rwaResponse->window;   // Update receiversWindowSize
       free(rwaResponse);
    }
    fflush(stdout);
@@ -161,14 +160,6 @@ void waitForNewWindow() {
    printf("Window full, sending RWA segment.\n\n");
    fflush(stdout);
    // Send RWA segment
-   Header *rwaSeg = malloc(sizeof(struct Header));
-   if (rwaSeg == NULL) { // malloc failed
-      perror("Error - malloc for new window request");
-      fflush(stdout);
-      exit(-1);
-   }
-   rwaSeg->segmentNumber = 0; // we do not want to increment with function call
-   rwaSeg->flags = RWA;
    int bytes = sendSegment(rwaSeg, false);
    if (bytes < 0) {
       perror("Error - retransmitting RWA segment");
@@ -187,15 +178,14 @@ void waitForNewWindow() {
       if (response->flags & ACK) {
          removeNodes(response->acknowledgement);
       }
-      receiversWindowSize = response->window;   // Update receiversWindowSize
       free(response);
    }
 
-   printf("Window advertisement received.\n\n");
-   fflush(stdout);
-
    alarm(0); // response received, cancel timer
    waitingForWindow = false;
+
+   printf("Window advertisement received.\n\n");
+   fflush(stdout);
 
    // Returns here to contine sending data
 }
@@ -209,7 +199,7 @@ void waitForNewWindow() {
 void endOfMessage() {
    alarm(INTERVAL);
    while (head != NULL) {
-      printf("Listening for all acknowledgements\n\n");
+      printf("\n\nListening for all acknowledgements\n\n");
       fflush(stdout);
       Header* segResponse = listenForSegment();
       if (segResponse == NULL) {
@@ -218,17 +208,19 @@ void endOfMessage() {
          free(segResponse);
          continue;
       }
+
       printHeader(segResponse);
       if (segResponse->flags & ACK) {
          printf("received ack for segment %u\n\n", segResponse->acknowledgement);
          fflush(stdout);
          removeNodes(segResponse->acknowledgement);
       }
+
       free(segResponse);
    }
    alarm(0);
 
-   printf("Received acknowledgemetns for all segments, sending EOM.\n\n");
+   printf("Received acknowledgements for all segments, sending EOM.\n\n");
    fflush(stdout);
 
    // All segments have been acknowledged
@@ -260,6 +252,7 @@ void endOfMessage() {
 */
 int sendSegment(Header *segP, bool isRetry) {
    int bytes;
+
    bytes = sendto(sockfd, segP, sizeof(*segP), 0, (const struct sockaddr *) &dest, sizeof(dest));
    if (bytes < 0) {
       perror("Error - sending segment");
@@ -269,7 +262,7 @@ int sendSegment(Header *segP, bool isRetry) {
 
    receiversWindowSize -= 1;
 
-   if (segP->flags & DAT) {
+   if (!isRetry && segP->flags & DAT) {
       addNode(segP);
    }
    return bytes;
@@ -316,6 +309,7 @@ Header* listenForSegment() {
       printf("segment received.\n\n");
       fflush(stdout);
    }
+   receiversWindowSize = seg->window;
    return seg;
 }
 
@@ -329,11 +323,11 @@ void retransmitSegments() {
    while (currentNode->next != NULL) {
 
       // Check window size before continuing
-      // if (receiversWindowSize <= 0) {
-      //    printf("Receiver is full, waiting for new window.\n\n");
-      //    fflush(stdout);
-      //    waitForNewWindow();
-      // }
+      if (receiversWindowSize <= 0) {
+         printf("Receiver is full, waiting for new window before retransmitting more segments.\n\n");
+         fflush(stdout);
+         waitForNewWindow();
+      }
       
       int bytes = sendSegment(currentNode->segment, true); // retransmit segment
       if (bytes < 0) {
@@ -341,6 +335,13 @@ void retransmitSegments() {
          fflush(stdout);
       }
       currentNode = currentNode->next;
+   }
+
+   // Check window size before continuing
+   if (receiversWindowSize <= 0) {
+      printf("Receiver is full, waiting for new window before retransmitting more segments.\n\n");
+      fflush(stdout);
+      waitForNewWindow();
    }
 
    // Retransmit last segment in list
@@ -358,6 +359,9 @@ void retransmitSegments() {
  * due to timer expiring and being unacked
 */
 void retransmitRWASegment() {
+   rwaSeg->segmentNumber = 0; // doesn't matter
+   rwaSeg->flags = RWA;
+   rwaSeg->size = 0;
    int bytes = sendSegment(rwaSeg, true);
    if (bytes < 0) {
       perror("Error - retransmitting last segment in list");
