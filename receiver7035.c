@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
 
          if (DEBUG) {
             printf("Listening for new segment...\n");
+            fflush(stdout);
          }
 
          int n = recvfrom(sockfd, seg, sizeof(*seg), 0, (struct sockaddr *) &source, (socklen_t *) &sourceLen);
@@ -71,24 +72,21 @@ int main(int argc, char *argv[]) {
 
          if (seg->flags & DAT) { // Data segment received
             if (DEBUG) {
-               printf("DAT segment received.\n");
+               printf("DAT segment received.\n\n");
                printHeader(seg);
-               fflush(stdout);
             }
             addNodeInOrder(seg);
          } else if (seg->flags & RWA) { // Window Advertisement requested
             if (DEBUG) {
-               printf("RWA segment received.\n");
+               printf("RWA segment received.\n\n");
                printHeader(seg);
-               fflush(stdout);
             }
             acknowledgeRWASegment();
             free(seg);
          } else if (seg->flags & EOM) { // No more data segments to come, end execution
             if (DEBUG) {
-               printf("EOM segment received.\n");
+               printf("EOM segment received.\n\n");
                printHeader(seg);
-               fflush(stdout);
             }
             timer.it_value.tv_sec = 0;
             setitimer(ITIMER_REAL, &timer, NULL);
@@ -97,8 +95,8 @@ int main(int argc, char *argv[]) {
             break;
          } else { // Something happened, error handle here
             if (DEBUG) {
-               printf("Unknown packet received. Printing contents:\n"); // TODO: remove this
-               printHeader(seg); // TODO: remove this
+               printf("Unknown packet received. Printing contents:\n\n");
+               printHeader(seg);
             }
             free(seg);
          }      
@@ -130,6 +128,7 @@ void acknowledgeSegments() {
 
    if (DEBUG) {
       printf("Timer expired, acknowledging segments up to and including %u\n\n", segNum);
+      fflush(stdout);
    }
 
    seg->acknowledgement = segNum;
@@ -143,16 +142,29 @@ void acknowledgeSegments() {
 }
 
 void acknowledgeRWASegment() {
-   if (DEBUG) {
-      printf("Acknowledging RWA segment.\n\n");
-   }
    Header *seg = malloc(sizeof(struct Header));
    if (seg == NULL) { // malloc failed
       perror("Error - malloc for sending acknowledgement");
       return;
    }
+
    seg->flags = 0;
    seg->window = windowSize;
+
+   // check if I can acknowledge any segments
+   int lastSegNum = getLatestSegment();
+   if (lastSegNum >= 0) { // I can acknowledge segments
+      seg->flags = ACK;
+      seg->acknowledgement = lastSegNum;
+      if (DEBUG) {
+         printf("Acknowledging RWA segment and DAT segments up to %u.\n\n", lastSegNum);
+         fflush(stdout);
+      }
+   } else if (DEBUG) { // There are no segments to acknowledge
+      printf("Acknowledging RWA segment.\n\n");
+      fflush(stdout);
+   }
+
    int bytes = sendSegment(seg);
    if (bytes < 0) {
       ; // error handling done in sender
@@ -206,8 +218,12 @@ void addNodeInOrder(Header *segP) {
    newNode->segment = segP;
 
    // Base case: first node in list
-   if (head == NULL || head->segment->segmentNumber > segNum) {
+   if (head == NULL || head->segment->segmentNumber >= segNum) {
       if (head != NULL && head->segment->segmentNumber == segNum) { // duplicate segment number, discard node
+         if (DEBUG) {
+            printf("Received duplicate segment %u, discarding.\n\n", segNum);
+            fflush(stdout);
+         }
          free(newNode);
          return;
       }
@@ -222,6 +238,10 @@ void addNodeInOrder(Header *segP) {
    }
 
    if (currentNode->next && currentNode->next->segment->segmentNumber == segNum) { // duplicate segment number, discard node
+      if (DEBUG) {
+         printf("Received duplicate segment %u, discarding.\n\n", segNum);
+         fflush(stdout);
+      }
       free(newNode);
       return;
    }

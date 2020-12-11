@@ -15,7 +15,7 @@
 // Includes for shared.h
 #include <stdint.h>
 
-#define DEBUG true
+#define DEBUG false
 
 #define DAT 0x80
 #define ACK 0x40

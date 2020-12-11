@@ -176,6 +176,8 @@ void waitForNewWindow() {
    while (receiversWindowSize <= 0) {
       Header* response = listenForSegment(); // Await window size from receiver
       if (response->flags & ACK) {
+         printf("Acknowledgement received up to segment %u.\n\n", response->acknowledgement);
+         fflush(stdout);
          removeNodes(response->acknowledgement);
       }
       free(response);
