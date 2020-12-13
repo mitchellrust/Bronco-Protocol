@@ -1,5 +1,5 @@
 // Includes for receiver.c
-#include "shared7035.h"
+#include "shared.h"
 
 // Global Constants
 #define MAXWINSIZE 10 // max num of segments receiver can take at once

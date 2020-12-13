@@ -19,20 +19,20 @@
 #---------------------------------------------------------#
 
 #-------Target "all" builds executable and dependencies
-all:    sender7035 receiver7035
+all:    sender receiver
 
 #------Target "debug" builds debuggable binaries
 debug:  CFLAGS += -g -O0
 debug:  all
 
 #-------Target sender builds executable and dependencies
-sender7035: sender7035.o
-	$(CC) $(CFLAGS) sender7035.o -o sender7035
+sender: sender.o
+	$(CC) $(CFLAGS) sender.o -o sender7035
 
 #-------Target sender builds executable and dependencies
-receiver7035: receiver7035.o
-	$(CC) $(CFLAGS) receiver7035.o -o receiver7035
+receiver: receiver.o
+	$(CC) $(CFLAGS) receiver.o -o receiver7035
 
 #-------Target "clean" removes artifacts from build
 clean:
-	rm -f sender7035.o receiver7035.o sender7035 receiver7035 *~
+	rm -f sender.o receiver.o sender7035 receiver7035 *~
